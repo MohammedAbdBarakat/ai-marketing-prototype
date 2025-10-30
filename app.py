@@ -75,48 +75,51 @@ def is_termination_msg(content) -> bool:
         return True
     return False
 
-# === PHASE 1: ORCHESTRATED STRATEGY WORKFLOW ===
+# === PHASE 1: STRATEGY MEETING ===
 if st.session_state.current_phase >= 1:
     st.header("Phase 1: Strategy Generation")
     
     if 'strategies' not in st.session_state:
         if st.button("🚀 Run Phase 1: Strategy Generation"):
-            with st.status("Orchestrating the senior team...", expanded=True) as status:
+            with st.status("The senior team is in a strategy meeting...", expanded=True) as status:
                 brief = f"**Campaign Brief:**\n- Brand: {brand_info}\n- Audience: {target_users}\n- Goal: {main_goal}"
                 
-                # --- STEP 1.1: GET CREATIVE CONCEPTS ---
-                status.update(label="Asking Creative Director for initial concepts...")
-                cd_task = f"{brief}\n\nBased on this, please provide 3-4 distinct high-level creative concepts."
-                cd_response = agents['creative_director'].generate_reply(messages=[{"role": "user", "content": cd_task}])
-                st.session_state.cd_ideas = cd_response
-                with st.expander("Creative Director's Concepts", expanded=True):
-                    st.markdown(cd_response)
-                time.sleep(1)
-
-                # --- STEP 1.2: GET MEDIA BUYER ANALYSIS ---
-                status.update(label="Asking Media Buyer for feasibility analysis...")
-                mb_task = f"Here are the creative concepts:\n\n---\n{cd_response}\n---\n\nPlease provide a brief, high-level feasibility analysis on these ideas."
-                mb_response = agents['media_buyer'].generate_reply(messages=[{"role": "user", "content": mb_task}])
-                st.session_state.mb_analysis = mb_response
-                with st.expander("Media Buyer's Analysis", expanded=True):
-                    st.markdown(mb_response)
-                time.sleep(1)
-
-                # --- STEP 1.3: CEO SYNTHESIZES AND DECIDES ---
-                status.update(label="Asking CEO to synthesize and finalize strategies...")
-                ceo_task = (
-                    f"{brief}\n\nHere are the inputs from your team:\n\n**Creative Director's Concepts:**\n{st.session_state.cd_ideas}\n\n"
-                    f"**Media Buyer's Analysis:**\n{st.session_state.mb_analysis}\n\n"
-                    "Based on all of this, synthesize and define the 3 final marketing strategies as a numbered list and then write TERMINATE."
+                # --- SETUP THE GROUP CHAT FOR THE STRATEGY MEETING ---
+                strategy_group_chat = GroupChat(
+                    agents=[agents['ceo'], agents['creative_director'], agents['media_buyer']],
+                    messages=[], 
+                    max_round=40,
+                    speaker_selection_method="round_robin" 
                 )
-                ceo_response = agents['ceo'].generate_reply(messages=[{"role": "user", "content": ceo_task}])
-                st.session_state.strategies = ceo_response.replace("TERMINATE", "").strip()
-                status.update(label="Strategy Generation Complete!", state="complete")
+                manager = GroupChatManager(
+                    groupchat=strategy_group_chat, 
+                    llm_config=llm_config, 
+                    is_termination_msg=is_termination_msg
+                )
+
+                # --- START THE CONVERSATION ---
+                # The CEO starts the meeting with the brief
+                agents['user_proxy'].initiate_chat(
+                    manager, 
+                    message=f"CEO, you will start the meeting. Here is the brief:\n\n{brief}"
+                )
+
+                # --- EXTRACT THE FINAL RESULT & DISPLAY HISTORY ---
+                st.session_state.strategies = get_last_message_from("CEO", strategy_group_chat)
+                display_chat_history(strategy_group_chat, "phase1") # Use our history function
+                
+                status.update(label="Strategy Meeting Complete!", state="complete")
             st.rerun()
 
     if 'strategies' in st.session_state:
         st.subheader("✅ Output: 3 Core Strategies")
         st.markdown(st.session_state.strategies)
+        # Display the chat history for Phase 1 if it exists
+        if 'history_phase1' in st.session_state:
+            with st.expander("Show Strategy Meeting Details", expanded=False):
+                for msg in st.session_state.history_phase1:
+                    st.chat_message(name=msg['name']).markdown(msg['content'])
+
 
 # === PHASE 2: CREATIVE DEVELOPMENT ===
 if st.session_state.current_phase == 1 and 'strategies' in st.session_state:
@@ -132,24 +135,28 @@ if st.session_state.current_phase >= 2:
         if st.button("🎨 Run Phase 2: Creative Development"):
             with st.status("The creative team is brainstorming...", expanded=True) as status:
                 cd_phase2_prompt = (
-                    "You are Isabelle, the Creative Director. Your mission for THIS MEETING is to SUPERVISE your team to generate **exactly 1 campaign idea for each of the 3 marketing strategies (3 ideas total)**.\n"
-                    "**CRITICAL PROCESS TO FOLLOW:**\n"
-                    "1. Address your team and state the goal for Strategy 1.\n"
-                    "2. Let the Art Director and Copywriter discuss and develop ONE idea for it.\n"
-                    "3. **After they present the idea for Strategy 1, you MUST say 'Excellent. Now let's move to Strategy 2.' and state the goal for the second strategy.**\n"
-                    "4. Repeat this process for Strategy 3.\n"
-                    "5. **DO NOT summarize or end the meeting until you have one idea for ALL THREE strategies.**\n"
-                    "6. Your final message MUST be ONLY a markdown report of all 3 ideas. Then, write TERMINATE."
+                    "You are Isabelle, the Creative Director. Your mission is to SUPERVISE your team (Leo the Copywriter and Maria the Art Director) to generate **one APPROVED campaign idea for each of the 3 marketing strategies.**\n"
+                    "**CRITICAL SUPERVISORY PROCESS TO FOLLOW:**\n"
+                    "1. **Introduce the Goal:** Start by stating the goal for the current strategy (e.g., 'Team, let's focus on Strategy 1...')."
+                    "2. **Observe the Brainstorm:** You MUST then wait and allow the Art Director and Copywriter to discuss and develop their idea. Let them talk back-and-forth freely. Do not interrupt their creative exchange."
+                    
+                    "3. **Review and Decide:** After they present a combined idea, you MUST review it. You have two options:"
+                    "   - **If the idea is strong and meets the goal**, you will say 'Excellent, that's approved. Now let's move to the next strategy.' and then you will introduce the next strategy's goal."
+                    "   - **If the idea is weak or needs refinement**, you MUST provide specific, constructive feedback and ask for a revision. For example: 'That's a good start, but it's missing X. Can you refine it to be more Y?' or 'I like the copy, but the visuals feel disconnected. Please rethink the visual direction.' You will then go back to step 2 (Observe the Brainstorm) for this same strategy."
+                    
+                    "4. **Repeat for all Strategies:** You will repeat this 'Introduce -> Observe -> Review' loop until you have one APPROVED idea for all three strategies."
+                    
+                    "5. **Final Report:** Once THREE ideas have been approved, your absolute final task is to write the summary report. Your final message MUST ONLY be a markdown report of the 3 approved ideas. Then, and only then, write TERMINATE."
                 )
                 agents['creative_director'].update_system_message(cd_phase2_prompt)
 
                 creative_task = f"Creative Director, you will start the meeting. Here are the strategies:\n\n{st.session_state.strategies}"
                 
                 creative_group_chat = GroupChat(
-                    agents=[agents['user_proxy'], agents['creative_director'], agents['copywriter'], agents['art_director']],
+                    agents=[agents['creative_director'], agents['copywriter'], agents['art_director']],
                     messages=[], 
                     max_round=40,
-                    speaker_selection_method="round_robin"
+                    speaker_selection_method="auto"
                 )
                 manager = GroupChatManager(groupchat=creative_group_chat, llm_config=llm_config, is_termination_msg=is_termination_msg)
                 agents['user_proxy'].initiate_chat(manager, message=creative_task)

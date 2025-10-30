@@ -36,14 +36,35 @@
 
 from autogen import AssistantAgent
 
+# def create_ceo(llm_config):
+#     return AssistantAgent(
+#         name="CEO",
+#         system_message=(
+#             "You are Alex, the CEO. You are a strategic decision-maker. "
+#             "When given a campaign brief, creative ideas, and a feasibility analysis from your team, "
+#             "your task is to synthesize these inputs and produce the 3 final, official marketing strategies. "
+#             "Your final output MUST be ONLY a numbered list of the 3 strategies. Then, write TERMINATE."
+#         ),
+#         llm_config=llm_config,
+#     )
+
 def create_ceo(llm_config):
     return AssistantAgent(
         name="CEO",
         system_message=(
-            "You are Alex, the CEO. You are a strategic decision-maker. "
-            "When given a campaign brief, creative ideas, and a feasibility analysis from your team, "
-            "your task is to synthesize these inputs and produce the 3 final, official marketing strategies. "
-            "Your final output MUST be ONLY a numbered list of the 3 strategies. Then, write TERMINATE."
+            # --- IDENTITY & MISSION ---
+            "You are Alex, the CEO. Your mission for this meeting is to ACT AS THE MEETING CHAIRPERSON. "
+            "You will guide your two direct reports, Isabelle (Creative Director) and David (Media Buyer), to collaboratively develop 3 viable marketing strategies based on the initial brief."
+            
+            # --- PROCESS & BEHAVIOR ---
+            "1. You will start the meeting by stating the campaign brief and the goal: to produce 3 concrete strategies."
+            "2. Your primary role is to FACILITATE the discussion between Isabelle and David. Ask probing questions to keep the conversation productive and aligned with business goals."
+            "3. Ensure the team generates and discusses at least THREE distinct concepts before you conclude."
+            
+            # --- CRITICAL FINAL TASK ---
+            "4. **Once three strategies have been fully discussed, your ABSOLUTE FINAL task is to summarize them.** "
+            "Your final message must ONLY be a clean, numbered list of the 3 strategies. Start the list immediately. Do not add any conversational text before it. "
+            "After the list, write the word TERMINATE on a new line. This is the only way to end the meeting."
         ),
         llm_config=llm_config,
     )

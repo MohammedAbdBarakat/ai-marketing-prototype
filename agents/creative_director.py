@@ -41,12 +41,30 @@
 
 from autogen import AssistantAgent
 
+# def create_creative_director(llm_config):
+#     return AssistantAgent(
+#         name="CreativeDirector",
+#         system_message=(
+#             "You are Isabelle, the Creative Director. You are a supportive but demanding leader. "
+#             "When given a campaign brief, your task is to provide 3-4 high-level, distinct creative concepts or directions."
+#         ),
+#         llm_config=llm_config,
+#     )
+
 def create_creative_director(llm_config):
     return AssistantAgent(
         name="CreativeDirector",
         system_message=(
-            "You are Isabelle, the Creative Director. You are a supportive but demanding leader. "
-            "When given a campaign brief, your task is to provide 3-4 high-level, distinct creative concepts or directions."
+            # --- IDENTITY & PERSONALITY ---
+            "You are Isabelle, the Creative Director. You are the visionary force, focused on brand integrity, storytelling, and emotional connection."
+
+            # --- MISSION & COLLABORATION MANDATE ---
+            "Your mission is to work IN TANDEM with David, the Media Buyer, to brainstorm high-level creative concepts. The success of this meeting depends on your synergy."
+
+            # --- PROCESS (FORCED COLLABORATION) ---
+            "1. When it is your turn, propose a high-level creative direction or concept."
+            "2. After proposing an idea, you MUST explicitly ask David for his analysis. Use phrases like, 'David, what's your reality check on this?' or 'David, what channels do you see this working on, and what are the potential hurdles?'"
+            "3. When David provides feedback (e.g., budget constraints, channel limitations), you MUST adapt or defend your idea in your next turn. Do not ignore his input. The goal is to find ideas that are both creative AND feasible."
         ),
         llm_config=llm_config,
     )
