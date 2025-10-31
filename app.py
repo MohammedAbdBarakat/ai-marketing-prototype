@@ -69,11 +69,32 @@ if st.session_state.current_phase == 0:
     st.info("Fill in the brief and click 'Start'.")
 
 # --- Termination Function ---
-def is_termination_msg(content) -> bool:
-    have_content = content.get("content", None) is not None
-    if have_content and "terminate" in content.get("content", "").lower():
-        return True
-    return False
+def is_termination_msg(message) -> bool:
+    """
+    Checks if a message from a designated "leader" agent contains the word TERMINATE.
+    """
+    # Check if the message content exists and is a string
+    content = message.get("content", "")
+    if not isinstance(content, str):
+        return False
+
+    # Get the name of the agent who sent the message
+    speaker_name = message.get("name")
+
+    # Define a list of agents who are allowed to terminate a conversation
+    # These are the agents responsible for summarizing and concluding a phase.
+    allowed_terminators = ["CEO", "CreativeDirector", "MediaBuyer"]
+
+    # Check if the speaker is in our allowed list
+    is_allowed_terminator = speaker_name in allowed_terminators
+    
+    # Check if the message content contains the termination keyword
+    has_terminate = "terminate" in content.lower()
+
+    # The message is a termination message if both conditions are true
+    return is_allowed_terminator and has_terminate
+
+
 
 # === PHASE 1: STRATEGY MEETING ===
 if st.session_state.current_phase >= 1:
@@ -100,9 +121,30 @@ if st.session_state.current_phase >= 1:
                 # --- START THE CONVERSATION ---
                 # The CEO starts the meeting with the brief
                 agents['user_proxy'].initiate_chat(
-                    manager, 
-                    message=f"CEO, you will start the meeting. Here is the brief:\n\n{brief}"
+                manager,
+                message=(
+                    f"🧠 Phase 1: Strategic Alignment Meeting\n\n"
+                    f"Here is the campaign brief:\n\n{brief}\n\n"
+                    "Participants:\n"
+                    "• Alex — CEO (meeting chairperson)\n"
+                    "• Isabelle — Creative Director\n"
+                    "• David — Media Buyer\n\n"
+                    "🎯 **Goal:** Collaboratively develop exactly **three distinct and approved marketing strategies** "
+                    "that align with the campaign brief.\n\n"
+                    "💡 **Meeting Process:**\n"
+                    "1. **Alex (CEO)** opens the meeting, presents the brief, and proposes the **first draft idea**.\n"
+                    "2. **Isabelle (Creative Director)** then reacts from a creative and brand perspective — approve or reject and explain why.\n"
+                    "3. **David (Media Buyer)** follows with a feasibility and performance assessment — approve or reject and explain why.\n"
+                    "4. If either Isabelle or David rejects, Alex must refine the concept and restart that round until both approve.\n"
+                    "5. Once both approve, Alex confirms the idea as **Strategy #N (Approved)** and starts the next round.\n"
+                    "6. Repeat until three strategies are approved.\n"
+                    "7. When all three are approved, Alex summarizes them as a clean, numbered list and then writes **TERMINATE** on a new line.\n\n"
+                    "🗣️ **Guidelines:** Keep the discussion focused and realistic. Avoid unnecessary chatter. "
+                    "Each message should clearly show the reasoning behind your approval or rejection. "
+                    "The conversation ends only when Alex writes TERMINATE."
                 )
+            )
+
 
                 # --- EXTRACT THE FINAL RESULT & DISPLAY HISTORY ---
                 st.session_state.strategies = get_last_message_from("CEO", strategy_group_chat)
@@ -135,19 +177,29 @@ if st.session_state.current_phase >= 2:
         if st.button("🎨 Run Phase 2: Creative Development"):
             with st.status("The creative team is brainstorming...", expanded=True) as status:
                 cd_phase2_prompt = (
-                    "You are Isabelle, the Creative Director. Your mission is to SUPERVISE your team (Leo the Copywriter and Maria the Art Director) to generate **one APPROVED campaign idea for each of the 3 marketing strategies.**\n"
-                    "**CRITICAL SUPERVISORY PROCESS TO FOLLOW:**\n"
-                    "1. **Introduce the Goal:** Start by stating the goal for the current strategy (e.g., 'Team, let's focus on Strategy 1...')."
-                    "2. **Observe the Brainstorm:** You MUST then wait and allow the Art Director and Copywriter to discuss and develop their idea. Let them talk back-and-forth freely. Do not interrupt their creative exchange."
-                    
-                    "3. **Review and Decide:** After they present a combined idea, you MUST review it. You have two options:"
-                    "   - **If the idea is strong and meets the goal**, you will say 'Excellent, that's approved. Now let's move to the next strategy.' and then you will introduce the next strategy's goal."
-                    "   - **If the idea is weak or needs refinement**, you MUST provide specific, constructive feedback and ask for a revision. For example: 'That's a good start, but it's missing X. Can you refine it to be more Y?' or 'I like the copy, but the visuals feel disconnected. Please rethink the visual direction.' You will then go back to step 2 (Observe the Brainstorm) for this same strategy."
-                    
-                    "4. **Repeat for all Strategies:** You will repeat this 'Introduce -> Observe -> Review' loop until you have one APPROVED idea for all three strategies."
-                    
-                    "5. **Final Report:** Once THREE ideas have been approved, your absolute final task is to write the summary report. Your final message MUST ONLY be a markdown report of the 3 approved ideas. Then, and only then, write TERMINATE."
+                    "🎨 Phase 2: Creative Development — Supervisory Brief\n\n"
+                    "You are Isabelle, the Creative Director. You are supervising your team — "
+                    "Leo (Copywriter) and Maria (Art Director) — to produce one approved campaign concept for each of the three strategies provided.\n\n"
+
+                    "🎯 **Objective:** For each strategy, guide your team through a short, structured brainstorm that results in a finalized creative concept.\n\n"
+
+                    "🧭 **Your Supervisory Process:**\n"
+                    "1. **Introduce the current strategy** (e.g., 'Team, let’s focus on Strategy 1...').\n"
+                    "2. **Observe the brainstorm** between Leo and Maria. Let them exchange at least two meaningful rounds of collaboration.\n"
+                    "3. **Evaluate their combined idea:**\n"
+                    "   - If strong, clearly approve it (e.g., 'Excellent, that’s approved. Let’s move on.').\n"
+                    "   - If weak, provide specific feedback (what’s missing, tone, cohesion) and ask them to refine it.\n"
+                    "4. **Repeat** until all three strategies have an approved campaign idea.\n\n"
+
+                    "📘 **Final Task:**\n"
+                    "When all three campaigns are approved, summarize them in a **clear markdown report** using this structure:\n"
+                    "### Final Approved Campaign Ideas\n"
+                    "- Strategy 1: <title> — <summary>\n"
+                    "- Strategy 2: <title> — <summary>\n"
+                    "- Strategy 3: <title> — <summary>\n\n"
+                    "End your final message with the word **TERMINATE**."
                 )
+
                 agents['creative_director'].update_system_message(cd_phase2_prompt)
 
                 creative_task = f"Creative Director, you will start the meeting. Here are the strategies:\n\n{st.session_state.strategies}"
@@ -188,9 +240,22 @@ if st.session_state.current_phase >= 3:
         if st.button("📊 Run Phase 3: Media Buyer Analysis"):
             with st.status("The Media Buyer is analyzing...", expanded=True) as status:
                 mb_phase3_prompt = (
-                    "You are David, the Media Buyer. Your mission is to conduct a FINAL ASSESSMENT of the following creative work. "
-                    "Your final output must be ONLY a markdown report with sections for each strategy. Then, write TERMINATE."
+                    "📊 Phase 3: Final Media Analysis\n\n"
+                    "You are David, the Media Buyer. You are evaluating the creative report provided by Isabelle and her team. "
+                    "Your mission is to assess each campaign for **media feasibility, cost efficiency, and expected ROI**.\n\n"
+
+                    "🧭 **Your Assessment Process:**\n"
+                    "1. Review each strategy carefully.\n"
+                    "2. For each, write a section titled `### Strategy X: <Title>`.\n"
+                    "3. Inside each section, write three short parts:\n"
+                    "   - **Strengths:** practical media and engagement advantages.\n"
+                    "   - **Weaknesses:** risks or execution challenges.\n"
+                    "   - **Recommendations:** specific improvements or next actions.\n\n"
+                    "💡 Keep your tone analytical but collaborative — you’re guiding the team toward success, not criticizing.\n\n"
+                    "Your final message must ONLY be a markdown report following that format. "
+                    "End with the word **TERMINATE**."
                 )
+
                 agents['media_buyer'].update_system_message(mb_phase3_prompt)
                 assessment_task = f"Media Buyer, here is the creative report for your analysis:\n\n{st.session_state.creative_report}"
                 
